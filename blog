@@ -7,37 +7,57 @@ use Mango::BSON 'bson_time';
 # Documentation browser under "/perldoc"
 plugin 'PODRenderer';
 
+# Create a helper for Mango
 helper 'mango' => sub {
+	# Create a Mango instance once, then always use that
 	state $mango = Mango->new;
+	# Return the Mango instance
 	return $mango;
 };
 
+# Create a GET route for /
 get '/' => sub {
+  # Get the current object
   my $self = shift;
+  # Find all articles from the MongoDB database 'test' and collection 'articles'
   $self->mango->db('test')->collection('articles')->find({})->all(sub{
+  	# Get the results
 	my ($mango, $error, $docs) = @_;
+	# Stash the articles for rendering
 	$self->stash(articles => $docs);
-	  $self->render('index');
+	# Render the 'index' template
+	$self->render('index');
   });
-$self->render_later;
+  # Render later, so Mango query can run
+  $self->render_later;
 };
 
+# Create a POST route for /post
 post '/post' => sub {
+	# Get the current object
 	my $self = shift;
+	# Get the 'title' form parameter
 	my $title = $self->param('title');
+	# Get the 'content' form parameter
 	my $content = $self->param('content');
+	# Insert the title, content and a creation time into the articles collection
 	$self->mango->db('test')->collection('articles')->insert({
 		title => $title,
 		content => $content,
 		created => bson_time,
 	} => sub {
+		# Get the result
 		my ($mango, $error) = @_;
+		# Render an exception if we had an error
 		$self->render_exception("Error: $error") if $error;
+		# Otherwise redirect back to /
 		$self->redirect_to('/');
 	});
+	# Render later so Mango query can run
 	$self->render_later;
 };
 
+# Start our application
 app->start;
 __DATA__
 
