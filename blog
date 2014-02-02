@@ -1,0 +1,87 @@
+#!/usr/bin/env perl
+use Mojolicious::Lite;
+
+use Mango;
+use Mango::BSON 'bson_time';
+
+# Documentation browser under "/perldoc"
+plugin 'PODRenderer';
+
+helper 'mango' => sub {
+	state $mango = Mango->new;
+	return $mango;
+};
+
+get '/' => sub {
+  my $self = shift;
+  $self->mango->db('test')->collection('articles')->find({})->all(sub{
+	my ($mango, $error, $docs) = @_;
+	$self->stash(articles => $docs);
+	  $self->render('index');
+  });
+$self->render_later;
+};
+
+post '/post' => sub {
+	my $self = shift;
+	my $title = $self->param('title');
+	my $content = $self->param('content');
+	$self->mango->db('test')->collection('articles')->insert({
+		title => $title,
+		content => $content,
+		created => bson_time,
+	} => sub {
+		my ($mango, $error) = @_;
+		$self->render_exception("Error: $error") if $error;
+		$self->redirect_to('/');
+	});
+	$self->render_later;
+};
+
+app->start;
+__DATA__
+
+@@ index.html.ep
+% layout 'default';
+% title 'Welcome';
+Welcome to the Mojolicious real-time web framework!
+
+@@ layouts/default.html.ep
+<!DOCTYPE html>
+<html>
+  <head>
+	<title><%= title %></title>
+
+	<!-- Latest compiled and minified CSS -->
+	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.0/css/bootstrap.min.css">
+	<!-- Optional theme -->
+	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.0/css/bootstrap-theme.min.css">
+	<!-- Latest compiled and minified JavaScript -->
+	<script src="//netdna.bootstrapcdn.com/bootstrap/3.1.0/js/bootstrap.min.js"></script>
+  </head>
+  <body>
+  <div class="container">
+    <h1>My blog</h1>
+    <h2>Post</h2>
+    <form action="/post" method="post" class="form">
+	<div class="form-group">
+		<label>Title</label> <input type="text" name="title" class="form-control" />
+	</div>
+	<div class="form-group">
+		<label>Content</label>
+		<textarea name="content" class="form-control"></textarea>
+	</div>
+	<button type="submit" value="Post" class="btn btn-default">Post article</button>
+    </form>
+    <h2>Articles</h2>
+    % for my $article (@$articles) {
+	<div class="panel panel-default">
+		<div class="panel-heading"><strong><%= $article->{title} %></strong></div>
+		<div class="panel-body">
+			<%= $article->{content} %>
+		</div>
+	</div>
+    % }
+   </div>
+  </body>
+</html>
